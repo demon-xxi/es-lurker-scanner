@@ -9,10 +9,12 @@ var util = require('util');
 var _ = require('lodash');
 var redis = require('./lib/redis.js');
 var moment = require('moment');
-var crypto = require('crypto');
 var async = require('async');
+var murmurhash = require('murmurhash');
 
 var TMI_URL = 'http://tmi.twitch.tv/group/user/%s/chatters';
+
+require('moment-timezone');
 
 var client = redis.connect();
 client.on("error", function (err) {
@@ -25,13 +27,10 @@ var options = {
         json: true
     },
     retry: {
-        retries: 5
+        retries: 10
     }
 };
 
-var hash = function (text) {
-    return crypto.createHash('md5').update(text).digest('base64').substr(0, 10);
-};
 
 var getViewers = function (name, cb) {
     needle.get(util.format(TMI_URL, name), options, function (err, response) {
@@ -39,39 +38,43 @@ var getViewers = function (name, cb) {
             return cb(err || response.body, null);
         }
 
-        if (!response.data.chatters) {
+        if (!response.body.chatters) {
             return cb("Invalid server response: " + response.body, null);
         }
 
         cb(null, _.union(
-            response.data.chatters.moderators,
-            response.data.chatters.admins,
-            response.data.chatters.staff,
-            response.data.chatters.viewers
+            response.body.chatters.moderators,
+            response.body.chatters.admins,
+            response.body.chatters.staff,
+            response.body.chatters.viewers
         ));
     });
 };
 
+var SEED = 1234567;
+var TOTAL = 3000000;
+var BUCKET = TOTAL / 100;
 var processChannel = function (channel, viewers, res) {
-    var gamehash = channel.game ? hash(channel.game) : '',
+    var gamehash = channel.game ? murmurhash.v3(channel.game) : 0,
         date = moment().tz('America/Los_Angeles').format('YYYYMMDD'),
-        timestamp = moment().tz('America/Los_Angeles').unix();
+        timestamp = moment().tz('America/Los_Angeles').unix(),
+        viewershash = _.map(viewers, function (name) {
+            return Math.floor((murmurhash.v3(name, SEED) % TOTAL) % BUCKET);
+        });
 
     async.parallel([
         function (callback) {
             client.hset('games', gamehash, channel.game, callback);
         },
         function (callback) {
-            //logger.info(channel.name, channel.game);
             var script = "local L = redis.call('GET', 'heartbeat:' .. KEYS[2]); local D = 300; " +
-                "if L then D = (KEYS[4] - L) end; " +
-                "for i=5, #KEYS do " +
-                "redis.call('HINCRBY', 's:' .. KEYS[1] .. ':' .. KEYS[i], KEYS[2] , D); " +
-                "redis.call('EXPIRE',  's:' .. KEYS[1] .. ':' .. KEYS[i], 172800); " +
-                "redis.call('HINCRBY', 'g:' .. KEYS[1] .. ':' .. KEYS[i], KEYS[3] , D); " +
-                "redis.call('EXPIRE',  'g:' .. KEYS[1] .. ':' .. KEYS[i], 172800); " +
-                "end; redis.call('SETEX', 'heartbeat:' .. KEYS[2], 660, KEYS[4]); ",
-                args = _.flatten([script, viewers.length + 4, date, channel.name, gamehash, timestamp, viewers]);
+                    "if L then D = (KEYS[4] - L) end; " +
+                    "local H =  (#KEYS-4)/2;" +
+                    "local T =  #KEYS-H;" +
+                    "for i=5, T do " +
+                    "redis.call('HINCRBY', 'U:' .. KEYS[1] .. ':' .. KEYS[i+H], KEYS[2] .. ':' .. KEYS[i] , D); " +
+                    "end; redis.call('SETEX', 'heartbeat:' .. KEYS[2], 660, KEYS[4]); ",
+                args = _.flatten([script, viewers.length * 2 + 4, date, channel.name, gamehash, timestamp, viewers, viewershash]);
             client.eval(args, callback);
         }
 
@@ -88,7 +91,7 @@ var processChannel = function (channel, viewers, res) {
 router.post('/channel/:channel', function (req, res) {
     var channel = req.body;
 
-    getViewers(channel.name, options, function (err, viewers) {
+    getViewers(channel.name, function (err, viewers) {
         if (err) {
             log.error(err);
             return res.status(502).jsonp({error: err});
