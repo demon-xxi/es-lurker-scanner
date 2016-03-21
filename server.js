@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+
+/*jslint  node:true */
+'use strict';
+
 var express = require('express');
 var morgan = require('morgan');
 var winston = require('winston');
@@ -26,6 +30,6 @@ app.use('/scan', require('./scanner'));
 
 app.set('port', process.env.PORT || 3000);
 
-var server = app.listen(app.get('port'), function() {
-    console.log('Express server listening on port ' + app.get('port')   );
+var server = app.listen(app.get('port'), function () {
+    console.log('Express server listening on port ' + app.get('port'));
 });
