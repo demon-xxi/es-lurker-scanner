@@ -12,7 +12,7 @@ var util = require('util');
 var PAGE = 100;
 var TWITCH_PARAL = 50;
 var API_PARAL = 100;
-var MIN_VIEWERS = 1000;
+var MIN_VIEWERS = 10;
 
 var TWITCH_URL = 'https://api.twitch.tv/kraken/streams?&offset=%d&limit=%d';
 var API_URL = 'http://' + (process.env.WEBSITE_HOSTNAME || 'localhost:3000') + '/scan/channel/';
