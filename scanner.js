@@ -87,7 +87,12 @@ var processChannel = function (channel, viewers, res) {
         function (callback) {
             var args = _.flatten([SCRIPT_SHA1, viewers.length * 2 + 4,
                 date, channel.name, gamehash, timestamp, viewers, viewershash]);
-            client.evalsha(args, callback);
+            client.evalsha(args, function (err, data) {
+                if (err){
+                    log.err(err);
+                }
+                callback(err, data);
+            });
         }
 
     ], function (err, results) {

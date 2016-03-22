@@ -27,6 +27,7 @@ app.use(bodyParser.json());
 
 // routes
 app.use('/scan', require('./scanner'));
+app.use('/aggregate', require('./aggregator'));
 
 app.set('port', process.env.PORT || 3000);
 
