@@ -89,7 +89,7 @@ var processGroup = function (task, callback) {
 
         var result = _.reduce(totals, function (result, stats, viewer) {
             var cnt = _.size(stats.channels) + _.size(stats.games);
-            if (result.count == 0 || result.count + cnt < 1000) {
+            if (result.batch.size() < 100 && (result.count == 0 || result.count + cnt < 1000)) {
                 result.count += cnt;
                 result.batch.insertOrReplaceEntity({
                     PartitionKey: partitionKey,
