@@ -13,7 +13,7 @@ var azure = require('azure-storage');
 
 //var murmurhash = require('murmurhash');
 
-var CONCURRENCY = 100;
+var CONCURRENCY = 10;
 
 require('moment-timezone');
 
@@ -85,11 +85,11 @@ var processGroup = function (task, callback) {
             return result;
         }, {});
 
-        log.info('Processing Group', task.key, _.keys(totals));
+        log.info('Processing Group', task.key, _.size(totals));
 
         var result = _.reduce(totals, function (result, stats, viewer) {
             var cnt = _.size(stats.channels) + _.size(stats.games);
-            if (result.count + cnt < 1000) {
+            if (result.count == 0 || result.count + cnt < 1000) {
                 result.count += cnt;
                 result.batch.insertOrReplaceEntity({
                     PartitionKey: partitionKey,
