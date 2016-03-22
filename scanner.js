@@ -13,6 +13,7 @@ var async = require('async');
 var murmurhash = require('murmurhash');
 
 var TMI_URL = 'http://tmi.twitch.tv/group/user/%s/chatters';
+var SCRIPT_SHA1 = null;
 
 require('moment-timezone');
 
@@ -20,6 +21,23 @@ var client = redis.connect();
 client.on("error", function (err) {
     log.error("Redis error", err);
 });
+
+client.on("ready", function () {
+
+    var script = "local L = redis.call('GET', 'heartbeat:' .. KEYS[2]); local D = 300; " +
+        "if L then D = (KEYS[4] - L) end; " +
+        "local H =  (#KEYS-4)/2;" +
+        "local T =  #KEYS-H;" +
+        "for i=5, T do " +
+        "redis.call('HINCRBY', 'U:' .. (KEYS[i+H]%100) .. ':' .. KEYS[1] .. ':' .. KEYS[i+H], KEYS[2] .. ':' .. KEYS[i] , D); " +
+        "end; redis.call('SETEX', 'heartbeat:' .. KEYS[2], 660, KEYS[4]); ";
+
+    client.script('load', script, function (err, sha) {
+        SCRIPT_SHA1 = sha;
+    });
+
+});
+
 
 var options = {
     needle: {
@@ -67,15 +85,9 @@ var processChannel = function (channel, viewers, res) {
             client.hset('games', gamehash, channel.game, callback);
         },
         function (callback) {
-            var script = "local L = redis.call('GET', 'heartbeat:' .. KEYS[2]); local D = 300; " +
-                    "if L then D = (KEYS[4] - L) end; " +
-                    "local H =  (#KEYS-4)/2;" +
-                    "local T =  #KEYS-H;" +
-                    "for i=5, T do " +
-                    "redis.call('HINCRBY', 'U:' .. KEYS[1] .. ':' .. KEYS[i+H], KEYS[2] .. ':' .. KEYS[i] , D); " +
-                    "end; redis.call('SETEX', 'heartbeat:' .. KEYS[2], 660, KEYS[4]); ",
-                args = _.flatten([script, viewers.length * 2 + 4, date, channel.name, gamehash, timestamp, viewers, viewershash]);
-            client.eval(args, callback);
+            var args = _.flatten([SCRIPT_SHA1, viewers.length * 2 + 4,
+                date, channel.name, gamehash, timestamp, viewers, viewershash]);
+            client.evalsha(args, callback);
         }
 
     ], function (err, results) {
