@@ -11,7 +11,7 @@ var util = require('util');
 
 var PAGE = 100;
 var TWITCH_PARAL = 50;
-var API_PARAL = 100;
+var API_PARAL = 25;
 var MIN_VIEWERS = 10;
 
 var TWITCH_URL = 'https://api.twitch.tv/kraken/streams?&offset=%d&limit=%d';
