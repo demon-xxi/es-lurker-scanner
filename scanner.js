@@ -29,7 +29,7 @@ client.on("ready", function () {
         "local H =  (#KEYS-4)/2;" +
         "local T =  #KEYS-H;" +
         "for i=5, T do " +
-        "redis.call('HINCRBY', 'U:' .. (KEYS[i+H]%100) .. ':' .. KEYS[1] .. ':' .. KEYS[i+H], KEYS[2] .. ':' .. KEYS[i] , D); " +
+        "redis.call('HINCRBY', 'U:' .. (KEYS[i+H]%100) .. ':' .. KEYS[1] .. ':' .. KEYS[i+H], KEYS[2] .. ':' .. KEYS[3] .. ':' .. KEYS[i] , D); " +
         "end; redis.call('SETEX', 'heartbeat:' .. KEYS[2], 660, KEYS[4]); ";
 
     client.script('load', script, function (err, sha) {
