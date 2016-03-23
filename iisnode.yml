@@ -1,2 +1,3 @@
-nodeProcessCountPerApplication: 4
+nodeProcessCountPerApplication: 2
+asyncCompletionThreadCount: 4
 debuggingEnabled: false
