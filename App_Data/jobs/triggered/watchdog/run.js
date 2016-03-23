@@ -28,15 +28,19 @@ var options = {
     }
 };
 
+var total = 0;
+var errors = 0;
 
 var worker = function (data, callback) {
     needle.post(API_URL + data.name, data, options, function (err, response) {
         if (err || response.statusCode >= 300) {
             log.error("Error posting channel", data.name, err);
             callback(err || response.body);
+            errors += 1;
             return;
         }
 
+        total += 1;
         log.info(data);
         callback();
     });
@@ -102,6 +106,7 @@ needle.get(util.format(TWITCH_URL, 1000000, 1), options, function (err, response
 
         // setting here to ensure it is called once
         queue.drain = function () {
+            log.info("Done!", {success: total, errors: errors});
             console.timeEnd("write");
         };
 
