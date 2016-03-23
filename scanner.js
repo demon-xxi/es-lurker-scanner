@@ -3,7 +3,12 @@
 
 var express = require('express');
 var router = express.Router();
-var log = require('winston');
+var winston = require('winston');
+var log = new (winston.Logger)({
+    transports: [
+        new (winston.transports.Console)({'timestamp':true})
+    ]
+});
 var needle = require('needle-retry');
 var util = require('util');
 var _ = require('lodash');
@@ -82,7 +87,7 @@ var processChannel = function (channel, viewers, res) {
 
     async.parallel([
         function (callback) {
-            client.hset('games', gamehash, channel.game, callback);
+            client.hset('games', gamehash, channel.game || "Unknown", callback);
         },
         function (callback) {
             var args = _.flatten([SCRIPT_SHA1, viewers.length * 2 + 4,

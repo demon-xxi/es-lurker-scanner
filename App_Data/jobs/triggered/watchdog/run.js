@@ -5,7 +5,12 @@
 require('http').globalAgent.maxSockets = 100;
 
 var needle = require('./../../../../node_modules/needle-retry');
-var log = require('./../../../../node_modules/winston');
+var winston = require('./../../../../node_modules/winston');
+var log = new (winston.Logger)({
+    transports: [
+        new (winston.transports.Console)({'timestamp':true})
+    ]
+});
 var async = require('./../../../../node_modules/async');
 var util = require('util');
 

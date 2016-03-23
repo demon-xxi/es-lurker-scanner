@@ -3,7 +3,12 @@
 
 var express = require('express');
 var router = express.Router();
-var log = require('winston');
+var winston = require('winston');
+var log = new (winston.Logger)({
+    transports: [
+        new (winston.transports.Console)({'timestamp':true})
+    ]
+});
 var util = require('util');
 var _ = require('lodash');
 var redis = require('./lib/redis.js');
@@ -89,13 +94,22 @@ var processGroup = function (task, callback) {
 
         var result = _.reduce(totals, function (result, stats, viewer) {
             var cnt = _.size(stats.channels) + _.size(stats.games);
+            var games = JSON.stringify(stats.games);
+            var channels = JSON.stringify(stats.channels);
+
+            // check for 64KB field limit. Skip large rows for now
+            if (games.length > 32768 || channels.length > 32768){
+                log.warn("Record exceeds 64KB limit", {key: task.key, viewer: viewer, games: games, channels: channels});
+                return result;
+            }
+
             if (result.batch.size() < 100 && (result.count == 0 || result.count + cnt < 1000)) {
                 result.count += cnt;
                 result.batch.insertOrReplaceEntity({
                     PartitionKey: partitionKey,
                     RowKey: entGen.String(viewer),
-                    Games: entGen.String(JSON.stringify(stats.games)),
-                    Channels: entGen.String(JSON.stringify(stats.channels)),
+                    Games: entGen.String(games),
+                    Channels: entGen.String(channels),
                     Total: entGen.Int32(stats.total)
                 }, {
                     echoContent: false

@@ -5,15 +5,20 @@
 require('http').globalAgent.maxSockets = 1000;
 
 var needle = require('./../../../../node_modules/needle-retry');
-var log = require('./../../../../node_modules/winston');
+var winston = require('./../../../../node_modules/winston');
+var log = new (winston.Logger)({
+    transports: [
+        new (winston.transports.Console)({'timestamp':true})
+    ]
+});
 var async = require('./../../../../node_modules/async');
 var moment = require('./../../../../node_modules/moment');
 var _ = require('./../../../../node_modules/lodash');
 require('./../../../../node_modules/moment-timezone');
 
-var API_PARAL = 8;
+var API_PARAL = 4;
 
-var date = moment().subtract(0, 'days').tz('America/Los_Angeles').format('YYYYMMDD');
+var date = moment().subtract(1, 'days').tz('America/Los_Angeles').format('YYYYMMDD');
 var API_URL = 'http://' + (process.env.WEBSITE_HOSTNAME || 'localhost:3000') + '/aggregate/viewers/'+date + '/';
 
 var options = {
