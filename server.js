@@ -5,7 +5,8 @@
 
 var express = require('express');
 var morgan = require('morgan');
-var winston = require('winston')({
+var winston = require('winston');
+var logger = new (winston.Logger)({
     transports: [
         new (winston.transports.Console)({'timestamp':true})
     ]
@@ -20,7 +21,7 @@ var app = express();
 // use winston stream for express logger middleware
 var winstonStream = {
     write: function (message) {
-        winston.info(message.slice(0, -1));
+        logger.info(message.slice(0, -1));
     }
 };
 

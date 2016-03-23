@@ -3,7 +3,8 @@
 
 var express = require('express');
 var router = express.Router();
-var log = require('winston')({
+var winston = require('winston');
+var log = new (winston.Logger)({
     transports: [
         new (winston.transports.Console)({'timestamp':true})
     ]
