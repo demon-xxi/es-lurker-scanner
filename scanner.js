@@ -82,7 +82,7 @@ var processChannel = function (channel, viewers, res) {
 
     async.parallel([
         function (callback) {
-            client.hset('games', gamehash, channel.game, callback);
+            client.hset('games', gamehash, channel.game || "Unknown", callback);
         },
         function (callback) {
             var args = _.flatten([SCRIPT_SHA1, viewers.length * 2 + 4,
