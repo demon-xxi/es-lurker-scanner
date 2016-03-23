@@ -81,7 +81,7 @@ var processGroup = function (task, callback) {
                 channel = parts[1],
                 game = task.games[parts[2]] || parts[2],
                 viewer = parts[0],
-                duration = parseInt(dur, 10);
+                duration = parseInt(dur, 36);
 
             result[viewer] = result[viewer] || {games: {}, channels: {}};
             result[viewer].total = (result[viewer].total || 0) + duration;
