@@ -2,7 +2,7 @@
 'use strict';
 
 // increase max sockets
-require('http').globalAgent.maxSockets = 1000;
+require('http').globalAgent.maxSockets = 100;
 
 var needle = require('./../../../../node_modules/needle-retry');
 var log = require('./../../../../node_modules/winston');
