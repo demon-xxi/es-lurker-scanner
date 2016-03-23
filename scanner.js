@@ -3,7 +3,11 @@
 
 var express = require('express');
 var router = express.Router();
-var log = require('winston');
+var log = require('winston')({
+    transports: [
+        new (winston.transports.Console)({'timestamp':true})
+    ]
+});
 var needle = require('needle-retry');
 var util = require('util');
 var _ = require('lodash');

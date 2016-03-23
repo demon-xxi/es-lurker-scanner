@@ -5,7 +5,11 @@
 
 var express = require('express');
 var morgan = require('morgan');
-var winston = require('winston');
+var winston = require('winston')({
+    transports: [
+        new (winston.transports.Console)({'timestamp':true})
+    ]
+});
 var bodyParser = require('body-parser');
 
 // increase max sockets
