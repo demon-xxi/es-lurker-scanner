@@ -1,20 +1,20 @@
 /*jslint  node:true */
 'use strict';
 
-var redis = require('redis');
-var client = require('./lib/redis.js').connect();
+//var client = require('./lib/redis.js').connect();
 var log = require('winston');
 var async = require('async');
 var _ = require('lodash');
 var murmurhash = require('murmurhash');
-var Buffer = require('buffer').Buffer;
+var jsonpack = require('jsonpack');
+var lzwCompress = require('lzwcompress');
+var LZUTF8 = require('./lib/lzutf8');
 
-client.on("error", function (err) {
-    log.error("Redis error", err);
-});
+//client.on("error", function (err) {
+//    log.error("Redis error", err);
+//});
 
 console.time("write");
-var list = "testlist";
 
 var TOTAL = 5000000;
 var ids = _.range(TOTAL);
@@ -25,36 +25,28 @@ var w = function (cb) {
     };
 };
 
-var BUCKET = 3000000 / 100;
+var json = [{"duration":88738,"channel":"pianoimproman"},{"duration":79174,"channel":"bobross"},{"duration":33162,"channel":"lirik"},{"duration":22267,"channel":"seriousgaming"},{"duration":4829,"channel":"leahloveschief"},{"duration":4706,"channel":"twitchoffice"},{"duration":2412,"channel":"summit1g"},{"duration":2412,"channel":"itmejp"},{"duration":2087,"channel":"krismpro"},{"duration":1805,"channel":"cohhcarnage"},{"duration":1489,"channel":"lustredust"},{"duration":589,"channel":"ltvictor"},{"duration":300,"channel":"chewiemelodies"},{"duration":292,"channel":"inetkoxtv"}];
 
-async.eachLimit(ids, 1000, function (i, callback) {
-    var username = "user" + i;
-    var key = Math.floor((murmurhash.v3(username) % TOTAL) % BUCKET);
-    client.hset(key, username, 1, w(callback));
-}, function(err){
-    if (err) log.info(err);
-    console.timeEnd("write");
-});
+var str = JSON.stringify(json);
+var jsonc = jsonpack.pack(json);
+var compressed = lzwCompress.pack(json);
+var lzutf8 = LZUTF8.compress(str, {outputEncoding: "BinaryString"});
 
-//var m = client.multi();
+log.info(compressed, lzutf8, LZUTF8.decompress(lzutf8, {inputEncoding: "BinaryString"}));
+log.info(str.length, jsonc.length, compressed.length, lzutf8.length);
 
-//var MAX_INT32 = Math.pow(2, 31) - 1;
+
 //var BUCKET = 3000000 / 100;
-//for (var i = 0; i < TOTAL; i++) {
-//    // client.sadd(list, "user"+i );
-//    var username = "user" + i;
-//    var id = (murmurhash.v3(username) % TOTAL) % BUCKET;
-//    var key = Math.floor(id);
-//    // log.info(username, key);
-//    //const buf = new Buffer(4);
-//    //buf.writeInt32LE(key,0);
-//    //m.hset(buf, buf, 1);
-//    client.hset(key, username, 1);
-//}
-
-//m.exec(function (msg) {
-//    log.info("Done!");
-//    log.info(msg);
+//
+//async.eachLimit(ids, 1000, function (i, callback) {
+//    var username = "user" + parseInt(i).toString(32);
+//    var key = Math.floor((murmurhash.v3(username) % TOTAL) % BUCKET).toString(32);
+//    client.hset(key, username, 1, w(callback));
+//}, function(err){
+//    if (err) log.info(err);
+//    console.timeEnd("write");
+//    client.quit();
 //});
+//
+//
 
-//console.timeEnd("write");

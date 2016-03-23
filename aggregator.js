@@ -6,7 +6,7 @@ var router = express.Router();
 var winston = require('winston');
 var log = new (winston.Logger)({
     transports: [
-        new (winston.transports.Console)({'timestamp':true})
+        new (winston.transports.Console)({'timestamp': true})
     ]
 });
 var util = require('util');
@@ -15,6 +15,7 @@ var redis = require('./lib/redis.js');
 var storage = require('./lib/azure-storage.js');
 var async = require('async');
 var azure = require('azure-storage');
+var LZUTF8 = require('./lib/lzutf8');
 
 //var murmurhash = require('murmurhash');
 
@@ -77,9 +78,9 @@ var processGroup = function (task, callback) {
 
         var totals = _.reduce(pairs, function (result, dur, key) {
             var parts = key.split(':'),
-                channel = parts[0],
-                game = task.games[parts[1]] || parts[1],
-                viewer = parts[2],
+                channel = parts[1],
+                game = task.games[parts[2]] || parts[2],
+                viewer = parts[0],
                 duration = parseInt(dur, 10);
 
             result[viewer] = result[viewer] || {games: {}, channels: {}};
@@ -92,55 +93,89 @@ var processGroup = function (task, callback) {
 
         log.info('Processing Group', task.key, _.size(totals));
 
-        var result = _.reduce(totals, function (result, stats, viewer) {
-            var cnt = _.size(stats.channels) + _.size(stats.games);
-            var games = JSON.stringify(stats.games);
-            var channels = JSON.stringify(stats.channels);
+        async.reduce(_.toPairs(totals), {
+            batches: [],
+            batch: new storage.TableBatch(),
+            count: 0
+        }, function (result, item, reducecallback) {
+            var viewer = item[0];
+            var stats = item[1];
 
-            // check for 64KB field limit. Skip large rows for now
-            if (games.length > 32768 || channels.length > 32768){
-                log.warn("Record exceeds 64KB limit", {key: task.key, viewer: viewer, games: games, channels: channels});
-                return result;
-            }
-
-            if (result.batch.size() < 100 && (result.count == 0 || result.count + cnt < 1000)) {
-                result.count += cnt;
-                result.batch.insertOrReplaceEntity({
-                    PartitionKey: partitionKey,
-                    RowKey: entGen.String(viewer),
-                    Games: entGen.String(games),
-                    Channels: entGen.String(channels),
-                    Total: entGen.Int32(stats.total)
-                }, {
-                    echoContent: false
+            async.map([stats.channels, stats.games], function (input, cb) {
+                LZUTF8.compressAsync(JSON.stringify(input), {outputEncoding: "BinaryString"}, function (result, error) {
+                    cb(error, result)
                 });
-            } else {
-                result.batches.push(result.batch);
-                result.batch = new storage.TableBatch();
-                result.count = 0;
-            }
-            return result;
-        }, {batches: [], batch: new storage.TableBatch(), count: 0});
-
-        if (result.count > 0) {
-            result.batches.push(result.batch);
-        }
-
-
-        async.eachLimit(result.batches, CONCURRENCY, function (batch, cb) {
-            async.retry(3, function (cb1) {
-                tableSvc.executeBatch(storage.viewerSummaryTable, batch, cb1);
-            }, function (err) {
-                if (!err) {
-                    task.stats.batches += 1;
-                    task.stats.records += batch.size();
-                } else {
-                    log.error(err);
-                    task.errors += 1;
+            }, function (err, results) {
+                if (err) {
+                    return reducecallback(err);
                 }
-                cb(null);
+
+
+                var cnt = _.size(stats.channels) + _.size(stats.games);
+                var games = results[1];
+                var channels = results[0];
+
+                // check for 64KB field limit. Skip large rows for now
+                if (games.length > 65536 || channels.length > 65536) {
+                    log.warn("Record exceeds 64KB limit", {
+                        key: task.key,
+                        viewer: viewer,
+                        games: stats.games,
+                        channels: stats.channels
+                    });
+                    return result;
+                }
+
+                if (result.batch.size() < 100 && (result.count == 0 || result.count + cnt < 1000)) {
+                    result.count += cnt;
+                    result.batch.insertOrReplaceEntity({
+                        PartitionKey: partitionKey,
+                        RowKey: entGen.String(viewer),
+                        Games: entGen.String(games),
+                        Channels: entGen.String(channels),
+                        Total: entGen.Int32(stats.total)
+                    }, {
+                        echoContent: false
+                    });
+                } else {
+                    result.batches.push(result.batch);
+                    result.batch = new storage.TableBatch();
+                    result.count = 0;
+                }
+
+                reducecallback(null, result);
+
             });
-        }, callback);
+
+        }, function (err, result) {
+
+            if (err){
+                return callback(err);
+            }
+
+            if (result.count > 0) {
+                result.batches.push(result.batch);
+            }
+
+
+            async.eachLimit(result.batches, CONCURRENCY, function (batch, cb) {
+                async.retry(3, function (cb1) {
+                    tableSvc.executeBatch(storage.viewerSummaryTable, batch, cb1);
+                }, function (err) {
+                    if (!err) {
+                        task.stats.batches += 1;
+                        task.stats.records += batch.size();
+                    } else {
+                        log.error(err);
+                        task.errors += 1;
+                    }
+                    cb(null);
+                });
+            }, callback);
+
+        });
+
+
 
     });
 
@@ -219,7 +254,7 @@ router.get('/viewers/:date/:batch', function (req, res) {
         date = req.params.date;
 
     async.waterfall(
-        [   createTable,
+        [createTable,
             connectRedis,
             getGames,
             getKeys(date, batch),
