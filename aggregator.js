@@ -83,10 +83,9 @@ var processGroup = function (task, callback) {
                 viewer = parts[0],
                 duration = parseInt(dur, 10);
 
-            result[viewer] = result[viewer] || {games: {}, channels: {}};
+            result[viewer] = result[viewer] || {views: [], total: 0};
             result[viewer].total = (result[viewer].total || 0) + duration;
-            result[viewer].games[game] = (result[viewer].games[game] || 0) + duration;
-            result[viewer].channels[channel] = (result[viewer].channels[channel] || 0) + duration;
+            result[viewer].views.push({game: game, channel: channel, duration: duration});
 
             return result;
         }, {});
@@ -99,41 +98,31 @@ var processGroup = function (task, callback) {
             count: 0
         }, function (result, item, reducecallback) {
             var viewer = item[0];
-            var stats = item[1];
+            var summary = item[1];
 
-            async.map([stats.channels, stats.games], function (input, cb) {
-                LZUTF8.compressAsync(JSON.stringify(input), {outputEncoding: "BinaryString"}, function (result, error) {
-                    cb(error, result)
-                });
-            }, function (err, results) {
-                if (err) {
+            LZUTF8.compressAsync(JSON.stringify(summary.views), {outputEncoding: "BinaryString"}, function (compressed, error) {
+                if (error) {
                     return reducecallback(err);
                 }
 
 
-                var cnt = _.size(stats.channels) + _.size(stats.games);
-                var games = results[1];
-                var channels = results[0];
-
                 // check for 64KB field limit. Skip large rows for now
-                if (games.length > 65536 || channels.length > 65536) {
+                if (compressed.length > 65536) {
                     log.warn("Record exceeds 64KB limit", {
                         key: task.key,
                         viewer: viewer,
-                        games: stats.games,
-                        channels: stats.channels
+                        stats: summary.views
                     });
                     return result;
                 }
 
-                if (result.batch.size() < 100 && (result.count == 0 || result.count + cnt < 1000)) {
-                    result.count += cnt;
+                if (result.batch.size() < 100) {
+                    result.count += 1;
                     result.batch.insertOrReplaceEntity({
                         PartitionKey: partitionKey,
                         RowKey: entGen.String(viewer),
-                        Games: entGen.String(games),
-                        Channels: entGen.String(channels),
-                        Total: entGen.Int32(stats.total)
+                        Views: entGen.String(compressed),
+                        Total: entGen.Int32(summary.total)
                     }, {
                         echoContent: false
                     });

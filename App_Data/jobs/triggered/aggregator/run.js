@@ -18,7 +18,7 @@ require('./../../../../node_modules/moment-timezone');
 
 var API_PARAL = 4;
 
-var date = moment().subtract(0, 'days').tz('America/Los_Angeles').format('YYYYMMDD');
+var date = moment().subtract(-1, 'days').tz('America/Los_Angeles').format('YYYYMMDD');
 var API_URL = 'http://' + (process.env.WEBSITE_HOSTNAME || 'localhost:3000') + '/aggregate/viewers/'+date + '/';
 
 var options = {
