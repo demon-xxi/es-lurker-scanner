@@ -8,7 +8,7 @@ var needle = require('./../../../../node_modules/needle-retry');
 var winston = require('./../../../../node_modules/winston');
 var log = new (winston.Logger)({
     transports: [
-        new (winston.transports.Console)({'timestamp':true})
+        new (winston.transports.Console)({'timestamp': true})
     ]
 });
 var async = require('./../../../../node_modules/async');
@@ -19,7 +19,7 @@ require('./../../../../node_modules/moment-timezone');
 var API_PARAL = 4;
 
 var date = moment().subtract(1, 'days').tz('America/Los_Angeles').format('YYYYMMDD');
-var API_URL = 'http://' + (process.env.WEBSITE_HOSTNAME || 'localhost:3000') + '/aggregate/viewers/'+date + '/';
+var API_URL = 'http://' + (process.env.WEBSITE_HOSTNAME || 'localhost:3000') + '/aggregate/viewers/' + date + '/';
 
 var options = {
     needle: {
@@ -41,14 +41,14 @@ var total = {
     errors: 0
 };
 async.eachLimit(batchs, API_PARAL, function (batch, callback) {
-    needle.get(API_URL + batch, options, function (err, response) {
+    needle.get(API_URL + batch, options, function (err, response, body) {
         if (err || response.statusCode >= 300) {
-            log.error("Error aggregating batch", batch, err, !!response ? response.body : "");
+            log.error("Error aggregating batch", batch, err, !!body ? body : (!!response ? response.body : ""));
         } else {
             var stats = response.body;
             log.info("Batch stats", batch, stats);
             total.batches += stats.batches;
-           //total.time += stats.time;
+            //total.time += stats.time;
             total.records += stats.records;
             total.errors += stats.errors;
         }
