@@ -160,7 +160,22 @@ var processGroup = function (task, callback) {
                     }
                     cb(null);
                 });
-            }, callback);
+            }, function (err) {
+
+                if (err){
+                    return callback(err);
+                }
+
+                if (task.errors > 0) {
+                    return callback(err);
+                }
+
+                // remove from cache
+                task.redisClient.del(task.key, function (err) {
+                    callback(err);
+                });
+
+            });
 
         });
 
