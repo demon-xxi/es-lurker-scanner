@@ -23,8 +23,8 @@ var API_URL = 'http://' + (process.env.WEBSITE_HOSTNAME || 'localhost:3000') + '
 
 var options = {
     needle: {
-        open_timeout: 300000,
-        read_timeout: 120000,
+        open_timeout: 3000000,
+        read_timeout: 1200000,
         compressed: true,
         json: true
     },
