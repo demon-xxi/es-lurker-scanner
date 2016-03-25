@@ -12,7 +12,8 @@ var log = new (winston.Logger)({
 var util = require('util');
 var _ = require('lodash');
 var redis = require('./lib/redis.js');
-var storage = require('./lib/azure-storage.js');
+var gatekeeper = require('./lib/gatekeeper');
+var storage = require('./lib/azure-storage');
 var async = require('async');
 var azure = require('azure-storage');
 var LZUTF8 = require('./lib/lzutf8');
@@ -138,7 +139,7 @@ var processGroup = function (task, callback) {
 
         }, function (err, result) {
 
-            if (err){
+            if (err) {
                 return callback(err);
             }
 
@@ -162,7 +163,7 @@ var processGroup = function (task, callback) {
                 });
             }, function (err) {
 
-                if (err){
+                if (err) {
                     return callback(err);
                 }
 
@@ -179,7 +180,6 @@ var processGroup = function (task, callback) {
             });
 
         });
-
 
 
     });
@@ -250,6 +250,10 @@ var cleanup = function (redisClient, stats, callback) {
 };
 
 router.get('/viewers/:date/:batch', function (req, res) {
+
+    if (!gatekeeper.allow(req)) {
+        return res.status(401).jsonp({error: 'Access Denied.'});
+    }
 
     if (!req.params.batch) {
         return res.status(400).send({error: "batch parameter is missing"});

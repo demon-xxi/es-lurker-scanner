@@ -15,6 +15,7 @@ var async = require('./../../../../node_modules/async');
 var moment = require('./../../../../node_modules/moment');
 var _ = require('./../../../../node_modules/lodash');
 require('./../../../../node_modules/moment-timezone');
+var gatekeeper = require('./../../../../lib/gatekeeper');
 
 var API_PARAL = 4;
 
@@ -26,12 +27,15 @@ var options = {
         open_timeout: 3000000,
         read_timeout: 1200000,
         compressed: true,
-        json: true
+        json: true,
+        headers: _.zipObject([gatekeeper.header],[gatekeeper.passcode])
     },
     retry: {
         retries: 2
     }
 };
+
+
 
 var batchs = _.range(100);
 var total = {

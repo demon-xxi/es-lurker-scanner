@@ -6,13 +6,14 @@ var router = express.Router();
 var winston = require('winston');
 var log = new (winston.Logger)({
     transports: [
-        new (winston.transports.Console)({'timestamp':true})
+        new (winston.transports.Console)({'timestamp': true})
     ]
 });
 var needle = require('needle-retry');
 var util = require('util');
 var _ = require('lodash');
 var redis = require('./lib/redis.js');
+var gatekeeper = require('./lib/gatekeeper.js');
 var moment = require('moment');
 var async = require('async');
 var murmurhash = require('murmurhash');
@@ -93,7 +94,7 @@ var processChannel = function (channel, viewers, res) {
             var args = _.flatten([SCRIPT_SHA1, viewers.length * 2 + 4,
                 date, channel.name, gamehash, timestamp, viewers, viewershash]);
             client.evalsha(args, function (err, data) {
-                if (err){
+                if (err) {
                     log.error(err);
                 }
                 callback(err, data);
@@ -111,6 +112,11 @@ var processChannel = function (channel, viewers, res) {
 
 
 router.post('/channel/:channel', function (req, res) {
+
+    if (!gatekeeper.allow(req)) {
+        return res.status(401).jsonp({error: 'Access Denied.'});
+    }
+
     var channel = req.body;
 
     getViewers(channel.name, function (err, viewers) {

@@ -11,6 +11,7 @@ var log = new (winston.Logger)({
         new (winston.transports.Console)({'timestamp':true})
     ]
 });
+var gatekeeper = require('./../../../../lib/gatekeeper');
 var async = require('./../../../../node_modules/async');
 var util = require('util');
 
@@ -35,11 +36,13 @@ var options = {
     }
 };
 
+var apiOptions = _.merge(options, {needle: {headers: _.zipObject([gatekeeper.header],[gatekeeper.passcode])}});
+
 var total = 0;
 var errors = 0;
 
 var worker = function (data, callback) {
-    needle.post(API_URL + data.name, data, options, function (err, response) {
+    needle.post(API_URL + data.name, data, apiOptions, function (err, response) {
         if (err || response.statusCode >= 300) {
             log.error("Error posting channel", data.name, err);
             callback(err || response.body);
