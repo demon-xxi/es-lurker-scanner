@@ -8,9 +8,18 @@ var morgan = require('morgan');
 var winston = require('winston');
 var logger = new (winston.Logger)({
     transports: [
-        new (winston.transports.Console)({'timestamp':true})
+        new (winston.transports.Console)({'timestamp': true})
     ]
 });
+
+
+// setting app insights
+if (process.env.APPINSIGHTS_INSTRUMENTATIONKEY) {
+    var appInsights = require("applicationinsights");
+    appInsights.setup().start();
+    logger.info("AppInsights automatic data collection enabled!");
+}
+
 var bodyParser = require('body-parser');
 
 // increase max sockets
@@ -19,7 +28,7 @@ require('http').globalAgent.maxSockets = 1000;
 
 // catch the uncaught errors that weren't wrapped in a domain or try catch statement
 // do not use this in modules, but only in applications, as otherwise we could have multiple of these bound
-process.on('uncaughtException', function(err) {
+process.on('uncaughtException', function (err) {
     // handle the error safely
     logger.error(err);
 });
