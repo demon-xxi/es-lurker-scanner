@@ -85,10 +85,10 @@ var numFmt = function (num, mask) {
 
 var processGroup = function (task, callback) {
 
-    // console.time('hgetall>' + task.key);
+    console.time('hgetall>' + task.key);
     console.time('processGroup > ' + task.key);
     task.redisClient.hgetall(task.key, function (err, pairs) {
-        // console.timeEnd('hgetall>' + task.key);
+        console.timeEnd('hgetall>' + task.key);
         if (err) {
             return callback(err);
         }
@@ -173,7 +173,7 @@ var processGroup = function (task, callback) {
             }
 
 
-            // console.time('executeBatch>' + task.key);
+            console.time('executeBatch > ' + task.key);
             // log.info('executeBatch', {'size': result.batches.length});
             async.eachLimit(result.batches, WRITE_CONCURRENCY, function (batch, cb) {
                 batch.commit(function (err, data) {
@@ -199,7 +199,7 @@ var processGroup = function (task, callback) {
                 //     cb(null);
                 // });
             }, function (err) {
-                // console.timeEnd('executeBatch>' + task.key);
+                console.timeEnd('executeBatch > ' + task.key);
                 console.timeEnd('processGroup > ' + task.key);
                 if (err) {
                     return callback(err);
