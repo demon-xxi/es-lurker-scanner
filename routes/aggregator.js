@@ -22,6 +22,7 @@ var LZUTF8 = require('./../lib/lzutf8');
 
 var READ_CONCURRENCY = 10;
 var WRITE_CONCURRENCY = 40;
+
 var TABLE_BATCH_SIZE = 50;
 
 require('moment-timezone');

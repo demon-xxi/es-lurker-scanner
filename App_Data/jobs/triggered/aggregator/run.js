@@ -37,7 +37,7 @@ var options = {
 
 
 
-var batchs = _.range(10);
+var batchs = _.range(100);
 var total = {
     batches: 0,
     time: new Date().getTime(),
