@@ -20,10 +20,24 @@ var LZUTF8 = require('./../lib/lzutf8');
 
 //var murmurhash = require('murmurhash');
 
-var CONCURRENCY = 10;
+var READ_CONCURRENCY = 10;
+var WRITE_CONCURRENCY = 40;
 
 require('moment-timezone');
 
+var Agent = require('agentkeepalive').HttpsAgent;
+
+var keepaliveAgent = new Agent({
+    maxSockets: 1000,
+    maxFreeSockets: 100,
+    timeout: 60000,
+    keepAliveTimeout: 30000 // free socket keepalive for 30 seconds
+});
+
+var azureTable = require('azure-table-node');
+var defaultClient = azureTable.createClient({
+    agent: keepaliveAgent
+});
 
 //var SEED = 1234567;
 //var TOTAL = 3000000;
@@ -33,10 +47,14 @@ var MAX_DAY = 99991231;
 var MASK = '000000';
 
 
-var tableSvc = storage.tableService();
+//var tableSvc = storage.tableService();
 
 var createTable = function (callback) {
-    tableSvc.createTableIfNotExists(storage.viewerSummaryTable, function (error) {
+    // tableSvc.createTableIfNotExists(storage.viewerSummaryTable, function (error) {
+    //     callback(error);
+    // });
+
+    defaultClient.createTable(storage.viewerSummaryTable, {ignoreIfExists: true}, function (error) {
         callback(error);
     });
 };
@@ -67,7 +85,10 @@ var numFmt = function (num, mask) {
 
 var processGroup = function (task, callback) {
 
+    // console.time('hgetall>' + task.key);
+    console.time('processGroup > ' + task.key);
     task.redisClient.hgetall(task.key, function (err, pairs) {
+        // console.timeEnd('hgetall>' + task.key);
         if (err) {
             return callback(err);
         }
@@ -75,7 +96,7 @@ var processGroup = function (task, callback) {
         var entGen = azure.TableUtilities.entityGenerator,
             keyParts = task.key.split(':'),
             day = MAX_DAY - parseInt(keyParts[2], 10),
-            partitionKey = entGen.String(util.format("%d:%d", day, numFmt(keyParts[3], MASK)));
+            partitionKey = util.format("%d:%s", day, numFmt(keyParts[3], MASK));
 
         var totals = _.reduce(pairs, function (result, dur, key) {
             var parts = key.split(':'),
@@ -95,7 +116,7 @@ var processGroup = function (task, callback) {
 
         async.reduce(_.toPairs(totals), {
             batches: [],
-            batch: new storage.TableBatch(),
+            batch: defaultClient.startBatch(), //new storage.TableBatch(),
             count: 0
         }, function (result, item, reducecallback) {
             var viewer = item[0];
@@ -117,19 +138,22 @@ var processGroup = function (task, callback) {
                     return result;
                 }
 
-                if (result.batch.size() < 100) {
+                if (result.count < 10) {
                     result.count += 1;
-                    result.batch.insertOrReplaceEntity({
+
+                    result.batch.insertOrReplaceEntity(storage.viewerSummaryTable, {
                         PartitionKey: partitionKey,
-                        RowKey: entGen.String(viewer),
-                        Views: entGen.String(compressed),
-                        Total: entGen.Int32(summary.total)
-                    }, {
-                        echoContent: false
-                    });
+                        RowKey: viewer,
+                        Views: compressed,
+                        Total: parseInt(summary.total, 10)
+                    }/*, {
+                         echoContent: false
+                         }*/
+                    );
                 } else {
+                    result.batch.size = result.count;
                     result.batches.push(result.batch);
-                    result.batch = new storage.TableBatch();
+                    result.batch = defaultClient.startBatch(); //new storage.TableBatch();
                     result.count = 0;
                 }
 
@@ -144,25 +168,39 @@ var processGroup = function (task, callback) {
             }
 
             if (result.count > 0) {
+                result.batch.size = result.count;
                 result.batches.push(result.batch);
             }
 
 
-            async.eachLimit(result.batches, CONCURRENCY, function (batch, cb) {
-                async.retry(3, function (cb1) {
-                    tableSvc.executeBatch(storage.viewerSummaryTable, batch, cb1);
-                }, function (err) {
+            // console.time('executeBatch>' + task.key);
+            // log.info('executeBatch', {'size': result.batches.length});
+            async.eachLimit(result.batches, WRITE_CONCURRENCY, function (batch, cb) {
+                batch.commit(function (err, data) {
                     if (!err) {
                         task.stats.batches += 1;
-                        task.stats.records += batch.size();
+                        task.stats.records += batch.size;
                     } else {
                         log.error(err);
                         task.errors += 1;
                     }
-                    cb(null);
+                    cb(null, data);
                 });
+                // async.retry(3, function (cb1) {
+                // tableSvc.executeBatch(storage.viewerSummaryTable, batch, cb1);
+                // }, function (err) {
+                //     if (!err) {
+                //         task.stats.batches += 1;
+                //         task.stats.records += batch.size();
+                //     } else {
+                //         log.error(err);
+                //         task.errors += 1;
+                //     }
+                //     cb(null);
+                // });
             }, function (err) {
-
+                // console.timeEnd('executeBatch>' + task.key);
+                console.timeEnd('processGroup > ' + task.key);
                 if (err) {
                     return callback(err);
                 }
@@ -174,7 +212,7 @@ var processGroup = function (task, callback) {
                 // remove from cache
                 // task.redisClient.del(task.key, function (err) {
                 //     log.info('Removed key: ', task.key);
-                    callback(err);
+                callback(err);
                 // });
 
             });
@@ -199,7 +237,7 @@ var getKeys = function (date, batch) {
         };
         var seed = 0;
         var done = false;
-        var queue = async.queue(processGroup, CONCURRENCY);
+        var queue = async.queue(processGroup, READ_CONCURRENCY);
         queue.drain = function () {
             if (done) {
                 callback(null, redisClient, stats);

@@ -7,9 +7,11 @@
     "node": "5.8.0 || 5.x.x || 4.4.0"
   },
   "dependencies": {
+    "agentkeepalive": "^2.0.5",
     "applicationinsights": "^0.15.13",
     "async": "^1.5.2",
     "azure-storage": "^0.9.0",
+    "azure-table-node": "^1.4.1",
     "body-parser": "^1.15.0",
     "express": "^4.13.4",
     "lodash": "^4.6.1",

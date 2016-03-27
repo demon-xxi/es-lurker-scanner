@@ -3,6 +3,7 @@
 /*jslint  node:true */
 'use strict';
 
+var http = require('http');
 var express = require('express');
 var morgan = require('morgan');
 var winston = require('winston');
@@ -23,8 +24,9 @@ if (process.env.APPINSIGHTS_INSTRUMENTATIONKEY) {
 var bodyParser = require('body-parser');
 
 // increase max sockets
-require('http').globalAgent.maxSockets = 1000;
-
+http.globalAgent.maxSockets = 1000;
+http.globalAgent.keepAlive = true;
+http.globalAgent.options.keepAlive = true;
 
 // catch the uncaught errors that weren't wrapped in a domain or try catch statement
 // do not use this in modules, but only in applications, as otherwise we could have multiple of these bound
