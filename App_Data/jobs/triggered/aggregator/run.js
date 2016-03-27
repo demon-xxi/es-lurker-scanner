@@ -25,7 +25,7 @@ var API_URL = 'http://' + (process.env.WEBSITE_HOSTNAME || 'localhost:3000') + '
 var options = {
     needle: {
         open_timeout: 3000000,
-        read_timeout: 1200000,
+        read_timeout: 3000000,
         compressed: true,
         json: true,
         headers: _.zipObject([gatekeeper.header],[gatekeeper.passcode])
