@@ -122,7 +122,10 @@ var processGroup = function (task, callback) {
             var viewer = item[0];
             var summary = item[1];
 
+            console.time('LZUTF8 > ' + task.key);
             LZUTF8.compressAsync(JSON.stringify(summary.views), {outputEncoding: "BinaryString"}, function (compressed, error) {
+                console.timeEnd('LZUTF8 > ' + task.key);
+
                 if (error) {
                     return reducecallback(err);
                 }
