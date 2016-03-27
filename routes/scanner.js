@@ -12,8 +12,9 @@ var log = new (winston.Logger)({
 var needle = require('needle-retry');
 var util = require('util');
 var _ = require('lodash');
-var redis = require('./lib/redis.js');
-var gatekeeper = require('./lib/gatekeeper.js');
+var redis = require('./../lib/redis');
+var datautil = require('./../lib/datautil');
+var gatekeeper = require('./../lib/gatekeeper');
 var moment = require('moment');
 var async = require('async');
 var murmurhash = require('murmurhash');
@@ -75,16 +76,11 @@ var getViewers = function (name, cb) {
     });
 };
 
-var SEED = 1234567;
-var TOTAL = 3000000;
-var BUCKET = TOTAL / 100;
 var processChannel = function (channel, viewers, res) {
     var gamehash = channel.game ? murmurhash.v3(channel.game).toString(36) : 0,
         date = moment().tz('America/Los_Angeles').format('YYYYMMDD'),
         timestamp = moment().tz('America/Los_Angeles').unix(),
-        viewershash = _.map(viewers, function (name) {
-            return Math.floor((murmurhash.v3(name, SEED) % TOTAL) % BUCKET).toString(36);
-        });
+        viewershash = _.map(viewers, datautil.viewershash36);
 
     async.parallel([
         function (callback) {

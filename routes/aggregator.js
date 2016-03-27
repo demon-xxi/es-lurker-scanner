@@ -11,12 +11,12 @@ var log = new (winston.Logger)({
 });
 var util = require('util');
 var _ = require('lodash');
-var redis = require('./lib/redis.js');
-var gatekeeper = require('./lib/gatekeeper');
-var storage = require('./lib/azure-storage');
+var redis = require('./../lib/redis.js');
+var gatekeeper = require('./../lib/gatekeeper');
+var storage = require('./../lib/azure-storage');
 var async = require('async');
 var azure = require('azure-storage');
-var LZUTF8 = require('./lib/lzutf8');
+var LZUTF8 = require('./../lib/lzutf8');
 
 //var murmurhash = require('murmurhash');
 

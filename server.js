@@ -47,9 +47,20 @@ app.use(morgan(logformat, {stream: winstonStream}));
 
 app.use(bodyParser.json());
 
+
+var ensureAuthenticated = function(req, res, next) {
+    //if (req.header("Authorization") && req.header("Authorization").startsWith("Bearer")) {
+        return next();
+    //}
+    //req.session.redirectUrl = req.url;
+    //return res.send(401);
+};
+
+
 // routes
-app.use('/scan', require('./scanner'));
-app.use('/aggregate', require('./aggregator'));
+app.use('/scan', require('./routes/scanner'));
+app.use('/aggregate', require('./routes/aggregator'));
+app.use('/api', ensureAuthenticated, require('./routes/api'));
 
 app.set('port', process.env.PORT || 3000);
 
