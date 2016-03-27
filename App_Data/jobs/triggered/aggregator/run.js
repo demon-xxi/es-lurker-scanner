@@ -17,7 +17,7 @@ var _ = require('./../../../../node_modules/lodash');
 require('./../../../../node_modules/moment-timezone');
 var gatekeeper = require('./../../../../lib/gatekeeper');
 
-var API_PARAL = 4;
+var API_PARAL = 2;
 
 var date = moment().subtract(1, 'days').tz('America/Los_Angeles').format('YYYYMMDD');
 var API_URL = 'http://' + (process.env.WEBSITE_HOSTNAME || 'localhost:3000') + '/aggregate/viewers/' + date + '/';
