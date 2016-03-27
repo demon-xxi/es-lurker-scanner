@@ -172,10 +172,10 @@ var processGroup = function (task, callback) {
                 }
 
                 // remove from cache
-                task.redisClient.del(task.key, function (err) {
-                    log.info('Removed key: ', task.key);
+                // task.redisClient.del(task.key, function (err) {
+                //     log.info('Removed key: ', task.key);
                     callback(err);
-                });
+                // });
 
             });
 
