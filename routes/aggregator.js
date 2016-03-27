@@ -36,7 +36,7 @@ var MASK = '000000';
 var tableSvc = storage.tableService();
 
 var createTable = function (callback) {
-    tableSvc.createTableIfNotExists(storage.viewerSummaryTable, function (error, result, response) {
+    tableSvc.createTableIfNotExists(storage.viewerSummaryTable, function (error) {
         callback(error);
     });
 };
@@ -108,7 +108,7 @@ var processGroup = function (task, callback) {
 
 
                 // check for 64KB field limit. Skip large rows for now
-                if (compressed.length > 65536) {
+                if (compressed.length > 32768) {
                     log.warn("Record exceeds 64KB limit", {
                         key: task.key,
                         viewer: viewer,

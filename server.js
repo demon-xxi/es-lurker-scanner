@@ -16,7 +16,7 @@ var logger = new (winston.Logger)({
 // setting app insights
 if (process.env.APPINSIGHTS_INSTRUMENTATIONKEY) {
     var appInsights = require("applicationinsights");
-    appInsights.setup().start();
+    appInsights.enableVerboseLogging().setup().start();
     logger.info("AppInsights automatic data collection enabled!");
 }
 
