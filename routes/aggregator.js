@@ -22,6 +22,7 @@ var LZUTF8 = require('./../lib/lzutf8');
 
 var READ_CONCURRENCY = 10;
 var WRITE_CONCURRENCY = 40;
+var TABLE_BATCH_SIZE = 50;
 
 require('moment-timezone');
 
@@ -29,7 +30,7 @@ var Agent = require('agentkeepalive').HttpsAgent;
 
 var keepaliveAgent = new Agent({
     maxSockets: 1000,
-    maxFreeSockets: 100,
+    //maxFreeSockets: 100,
     timeout: 60000,
     keepAliveTimeout: 30000 // free socket keepalive for 30 seconds
 });
@@ -93,7 +94,7 @@ var processGroup = function (task, callback) {
             return callback(err);
         }
 
-        var entGen = azure.TableUtilities.entityGenerator,
+        var //entGen = azure.TableUtilities.entityGenerator,
             keyParts = task.key.split(':'),
             day = MAX_DAY - parseInt(keyParts[2], 10),
             partitionKey = util.format("%d:%s", day, numFmt(keyParts[3], MASK));
@@ -114,111 +115,92 @@ var processGroup = function (task, callback) {
 
         log.info('Processing Group', task.key, _.size(totals));
 
-        async.reduce(_.toPairs(totals), {
-            batches: [],
-            batch: defaultClient.startBatch(), //new storage.TableBatch(),
-            count: 0
-        }, function (result, item, reducecallback) {
+
+        var cargo = async.cargo(function (jobs, cargocb) {
+
+            var batch = defaultClient.startBatch();
+
+            _.each(jobs, function (job) {
+                batch.insertOrReplaceEntity(storage.viewerSummaryTable, job);
+            });
+
+            batch.commit(function (err, data) {
+                if (!err) {
+                    task.stats.batches += 1;
+                    task.stats.records += jobs.length;
+                } else {
+                    log.error(err);
+                    task.errors += 1;
+                }
+                cargocb(null, data);
+            });
+
+        }, TABLE_BATCH_SIZE);
+
+        var complete = function (err) {
+            console.timeEnd('executeBatch > ' + task.key);
+            console.timeEnd('processGroup > ' + task.key);
+            if (err) {
+                return callback(err);
+            }
+
+            if (task.errors > 0) {
+                return callback(err);
+            }
+
+            // remove from cache
+            // task.redisClient.del(task.key, function (err) {
+            //     log.info('Removed key: ', task.key);
+            callback(err);
+            // });
+        };
+
+        var done = false;
+        cargo.drain = function () {
+            if (done) {
+                complete(null);
+            }
+        };
+
+        console.time('executeBatch > ' + task.key);
+        console.time('LZUTF8 > ' + task.key);
+        async.each(_.toPairs(totals), function (item, mapcb) {
             var viewer = item[0];
             var summary = item[1];
-
-            console.time('LZUTF8 > ' + task.key);
             LZUTF8.compressAsync(JSON.stringify(summary.views), {outputEncoding: "BinaryString"}, function (compressed, error) {
-                console.timeEnd('LZUTF8 > ' + task.key);
-
                 if (error) {
-                    return reducecallback(err);
+                    return mapcb(error);
                 }
 
-
-                // check for 64KB field limit. Skip large rows for now
                 if (compressed.length > 32768) {
                     log.warn("Record exceeds 64KB limit", {
                         key: task.key,
                         viewer: viewer,
                         stats: summary.views
                     });
-                    return result;
-                }
-
-                if (result.count < 10) {
-                    result.count += 1;
-
-                    result.batch.insertOrReplaceEntity(storage.viewerSummaryTable, {
+                } else {
+                    cargo.push({
                         PartitionKey: partitionKey,
                         RowKey: viewer,
                         Views: compressed,
                         Total: parseInt(summary.total, 10)
-                    }/*, {
-                         echoContent: false
-                         }*/
-                    );
-                } else {
-                    result.batch.size = result.count;
-                    result.batches.push(result.batch);
-                    result.batch = defaultClient.startBatch(); //new storage.TableBatch();
-                    result.count = 0;
+                    });
                 }
 
-                reducecallback(null, result);
-
+                mapcb(null, item);
             });
-
-        }, function (err, result) {
-
+        }, function (err) {
+            console.timeEnd('LZUTF8 > ' + task.key);
             if (err) {
-                return callback(err);
+                return complete(err);
             }
 
-            if (result.count > 0) {
-                result.batch.size = result.count;
-                result.batches.push(result.batch);
+            if (cargo.length() === 0) {
+                complete(null);
+            } else {
+                done = true;
             }
 
-
-            console.time('executeBatch > ' + task.key);
-            // log.info('executeBatch', {'size': result.batches.length});
-            async.eachLimit(result.batches, WRITE_CONCURRENCY, function (batch, cb) {
-                batch.commit(function (err, data) {
-                    if (!err) {
-                        task.stats.batches += 1;
-                        task.stats.records += batch.size;
-                    } else {
-                        log.error(err);
-                        task.errors += 1;
-                    }
-                    cb(null, data);
-                });
-                // async.retry(3, function (cb1) {
-                // tableSvc.executeBatch(storage.viewerSummaryTable, batch, cb1);
-                // }, function (err) {
-                //     if (!err) {
-                //         task.stats.batches += 1;
-                //         task.stats.records += batch.size();
-                //     } else {
-                //         log.error(err);
-                //         task.errors += 1;
-                //     }
-                //     cb(null);
-                // });
-            }, function (err) {
-                console.timeEnd('executeBatch > ' + task.key);
-                console.timeEnd('processGroup > ' + task.key);
-                if (err) {
-                    return callback(err);
-                }
-
-                if (task.errors > 0) {
-                    return callback(err);
-                }
-
-                // remove from cache
-                // task.redisClient.del(task.key, function (err) {
-                //     log.info('Removed key: ', task.key);
-                callback(err);
-                // });
-
-            });
 
         });
 
