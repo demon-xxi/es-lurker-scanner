@@ -36,7 +36,7 @@ client.on("ready", function () {
         "local H =  (#KEYS-4)/2;" +
         "local T =  #KEYS-H;" +
         "for i=5, T do " +
-        "redis.call('HINCRBY', 'U:' .. (tonumber(KEYS[i+H], 36)%100) .. ':' .. KEYS[1] .. ':' .. KEYS[i+H], KEYS[i] .. ':' .. KEYS[2] .. ':' .. KEYS[3] , D); " +
+        "redis.call('HINCRBY', 'U:' .. (tonumber(KEYS[i+H], 36)%1000) .. ':' .. KEYS[1] .. ':' .. KEYS[i+H], KEYS[i] .. ':' .. KEYS[2] .. ':' .. KEYS[3] , D); " +
         "end; redis.call('SETEX', 'heartbeat:' .. KEYS[2], 660, KEYS[4]); ";
 
     client.script('load', script, function (err, sha) {
