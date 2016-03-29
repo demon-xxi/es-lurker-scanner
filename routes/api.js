@@ -10,14 +10,11 @@ var log = new (winston.Logger)({
     ]
 });
 var _ = require('lodash');
-var azure = require('azure-storage');
-var LZUTF8 = require('./../lib/lzutf8');
 var redis = require('./../lib/redis');
 var periods = require('./../lib/period');
-var moment = require('moment');
 var async = require('async');
 var datautil = require('./../lib/datautil');
-
+var LZString = require('lz-string');
 
 var games = null;
 var getGames = function (callback) {

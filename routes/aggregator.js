@@ -15,13 +15,9 @@ var redis = require('./../lib/redis.js');
 var gatekeeper = require('./../lib/gatekeeper');
 var storage = require('./../lib/azure-storage');
 var async = require('async');
-var azure = require('azure-storage');
-var LZUTF8 = require('./../lib/lzutf8');
-
-//var murmurhash = require('murmurhash');
+var LZString = require('lz-string');
 
 var READ_CONCURRENCY = 10;
-var WRITE_CONCURRENCY = 40;
 
 var TABLE_BATCH_SIZE = 50;
 
@@ -164,36 +160,29 @@ var processGroup = function (task, callback) {
         };
 
         console.time('executeBatch > ' + task.key);
-        console.time('LZUTF8 > ' + task.key);
+        console.time('LZString > ' + task.key);
         async.each(_.toPairs(totals), function (item, mapcb) {
             var viewer = item[0];
             var summary = item[1];
             var str = JSON.stringify(summary.views);
-            log.info('Compressing LZUTF8', str);
-            LZUTF8.compressAsync(str, {outputEncoding: "BinaryString"}, function (compressed, error) {
-                if (error) {
-                    return mapcb(error);
-                }
-
-                if (compressed.length > 32768) {
-                    log.warn("Record exceeds 64KB limit", {
-                        key: task.key,
-                        viewer: viewer,
-                        stats: summary.views
-                    });
-                } else {
-                    cargo.push({
-                        PartitionKey: partitionKey,
-                        RowKey: viewer,
-                        Views: compressed,
-                        Total: parseInt(summary.total, 10)
-                    });
-                }
-
-                mapcb(null, item);
-            });
+            var compressed = LZString.compress(str);
+            if (compressed.length > 32768) {
+                log.warn("Record exceeds 64KB limit", {
+                    key: task.key,
+                    viewer: viewer,
+                    stats: summary.views
+                });
+            } else {
+                cargo.push({
+                    PartitionKey: partitionKey,
+                    RowKey: viewer,
+                    Views: compressed,
+                    Total: parseInt(summary.total, 10)
+                });
+            }
+            mapcb(null, item);
         }, function (err) {
-            console.timeEnd('LZUTF8 > ' + task.key);
+            console.timeEnd('LZString > ' + task.key);
             if (err) {
                 return complete(err);
             }
