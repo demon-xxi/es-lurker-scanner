@@ -316,6 +316,7 @@ var cleanup = function (redisClient, stats, callback) {
     //redisClient.quit(function (err) {
     //    callback(err, stats);
     //});
+    redisClient.unref();
     callback(null, stats);
 };
 
