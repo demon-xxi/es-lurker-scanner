@@ -168,7 +168,9 @@ var processGroup = function (task, callback) {
         async.each(_.toPairs(totals), function (item, mapcb) {
             var viewer = item[0];
             var summary = item[1];
-            LZUTF8.compressAsync(JSON.stringify(summary.views), {outputEncoding: "BinaryString"}, function (compressed, error) {
+            var str = JSON.stringify(summary.views);
+            log.info('Compressing LZUTF8', str);
+            LZUTF8.compressAsync(str, {outputEncoding: "BinaryString"}, function (compressed, error) {
                 if (error) {
                     return mapcb(error);
                 }
