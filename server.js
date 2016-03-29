@@ -17,7 +17,7 @@ var logger = new (winston.Logger)({
 // do not use this in modules, but only in applications, as otherwise we could have multiple of these bound
 process.on('uncaughtException', function (err) {
     // handle the error safely
-    logger.error(err);
+    logger.error('uncaughtException', err);
 });
 
 
