@@ -169,8 +169,8 @@ var processGroup = function (task, callback) {
             if (compressed.length > 32768) {
                 log.warn("Record exceeds 64KB limit", {
                     key: task.key,
-                    viewer: viewer,
-                    stats: summary.views
+                    viewer: viewer
+                    //stats: summary.views
                 });
             } else {
                 cargo.push({
