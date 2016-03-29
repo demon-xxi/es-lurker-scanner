@@ -150,10 +150,10 @@ var processGroup = function (task, callback) {
             }
 
             // remove from cache
-            //task.redisClient.del(task.key, function (err) {
-            //    log.info('Removed key: ', task.key);
+            task.redisClient.del(task.key, function (err) {
+                log.info('Removed key: ', task.key);
                 callback(err);
-            //});
+            });
         };
 
         var done = false;
@@ -229,48 +229,92 @@ var getKeys = function (date, batch) {
                 callback(null, redisClient, stats);
             }
         };
-        async.doWhilst(
-            function (cb) {
-                redisClient.scan([seed, 'match', keys_pattern], function (err, data) {
-                    if (!err) {
-                        seed = parseInt(data[0], 10);
-                        _.forEach(data[1], function (key) {
-                            queue.push({
-                                stats: stats,
-                                key: key,
-                                games: games,
-                                redisClient: redisClient
-                            });
-                        });
-                    }
-                    cb(err);
-                });
 
-            },
-            function () {
-                return seed !== 0;
-            },
+        //redisClient.multi_scan(keys_pattern, function (key, cb) {
+        //    queue.push({
+        //        stats: stats,
+        //        key: key,
+        //        games: games,
+        //        redisClient: redisClient
+        //    });
+        //    cb();
+        //}, function (err) {
+        //    if (err) {
+        //        queue.kill();
+        //        return callback(err, redisClient, stats);
+        //    }
+        //    if (queue.length() === 0) {
+        //        return callback(null, redisClient, stats);
+        //    }
+        //    done = true;
+        //});
 
-            function (err) {
-                if (err) {
-                    queue.kill();
-                    return callback(err, redisClient, stats);
-                }
-                if (queue.length() === 0) {
-                    return callback(null, redisClient, stats);
-                }
-                done = true;
+        redisClient.keys(keys_pattern, function (err, keys) {
+            if (err) {
+                queue.kill();
+                return callback(err, redisClient, stats);
             }
-        );
+
+            _.forEach(keys, function(key){
+                queue.push({
+                    stats: stats,
+                    key: key,
+                    games: games,
+                    redisClient: redisClient
+                });
+            });
+
+            if (queue.length() === 0) {
+                return callback(null, redisClient, stats);
+            }
+            done = true;
+
+        });
+
+
+        //async.doWhilst(
+        //    function (cb) {
+        //        redisClient.scan([seed, 'match', keys_pattern], function (err, data) {
+        //            if (!err) {
+        //                seed = parseInt(data[0], 10);
+        //                _.forEach(data[1], function (key) {
+        //                    queue.push({
+        //                        stats: stats,
+        //                        key: key,
+        //                        games: games,
+        //                        redisClient: redisClient
+        //                    });
+        //                });
+        //            }
+        //            cb(err);
+        //        });
+        //
+        //    },
+        //    function () {
+        //        return seed !== 0;
+        //    },
+        //
+        //    function (err) {
+        //        if (err) {
+        //            queue.kill();
+        //            return callback(err, redisClient, stats);
+        //        }
+        //        if (queue.length() === 0) {
+        //            return callback(null, redisClient, stats);
+        //        }
+        //        done = true;
+        //    }
+        //);
 
     };
 };
 
 var cleanup = function (redisClient, stats, callback) {
     stats.time = new Date().getTime() - stats.time;
-    redisClient.quit(function (err) {
-        callback(err, stats);
-    });
+    //redisClient.quit(function (err) {
+    //    callback(err, stats);
+    //});
+    callback(null, stats);
 };
 
 router.get('/viewers/:date/:batch', function (req, res) {
