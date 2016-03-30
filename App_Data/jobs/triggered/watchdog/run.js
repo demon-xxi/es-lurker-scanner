@@ -9,7 +9,7 @@ var winston = require('./../../../../node_modules/winston');
 var _ = require('./../../../../node_modules/lodash');
 var log = new (winston.Logger)({
     transports: [
-        new (winston.transports.Console)({'timestamp':true})
+        new (winston.transports.Console)({'timestamp': true})
     ]
 });
 var gatekeeper = require('./../../../../lib/gatekeeper');
@@ -37,7 +37,7 @@ var options = {
     }
 };
 
-var apiOptions = _.merge(options, {needle: {headers: _.zipObject([gatekeeper.header],[gatekeeper.passcode])}});
+var apiOptions = _.merge(options, {needle: {headers: _.zipObject([gatekeeper.header], [gatekeeper.passcode])}});
 
 var total = 0;
 var errors = 0;
@@ -74,7 +74,7 @@ var enqueueStream = function (stream) {
         game: stream.channel.game
     };
 
-    queue.push(data, stream.viewers);
+    queue.push(data, 1000000000 - stream.viewers);
 };
 
 var getStreams = function (url, callback) {
