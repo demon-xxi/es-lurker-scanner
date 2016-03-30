@@ -40,6 +40,7 @@ var options = {
 var apiOptions = _.merge(options, {needle: {headers: _.zipObject([gatekeeper.header], [gatekeeper.passcode])}});
 
 var total = 0;
+var skipped = 0;
 var errors = 0;
 
 var worker = function (data, callback) {
@@ -64,6 +65,7 @@ var queue = async.priorityQueue(worker, API_PARAL);
 
 var enqueueStream = function (stream) {
     if (!stream || !stream.channel || parseInt(stream.viewers, 10) < MIN_VIEWERS) {
+        skipped += 1;
         return;
     }
 
@@ -117,7 +119,7 @@ needle.get(util.format(TWITCH_URL, 1000000, 1), options, function (err, response
 
         // setting here to ensure it is called once
         queue.drain = function () {
-            log.info("Done!", {success: total, errors: errors});
+            log.info("Done!", {success: total, errors: errors, skipped: skipped, min_viewers: MIN_VIEWERS});
             console.timeEnd("write");
         };
 
