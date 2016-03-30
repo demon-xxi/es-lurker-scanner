@@ -69,6 +69,7 @@ var enqueueStream = function (stream) {
         return;
     }
 
+    //noinspection JSUnresolvedVariable
     var data = {
         id: stream.channel._id,
         name: stream.channel.name,
@@ -88,7 +89,7 @@ var getStreams = function (url, callback) {
         }
 
         log.info(url);
-        response.body.streams.forEach(enqueueStream);
+        _.forEach(response.body.streams, enqueueStream);
         callback();
     });
 };
@@ -96,18 +97,18 @@ var getStreams = function (url, callback) {
 
 // get a total number of streams
 needle.get(util.format(TWITCH_URL, 1000000, 1), options, function (err, response) {
-    if (err || response.statusCode != 200) {
+    if (err || response.statusCode !== 200) {
         log.error("Error getting streams count.", err);
         return;
     }
 
-    var total = parseInt(response.body._total);
+    //noinspection JSUnresolvedVariable
+    var total = parseInt(response.body._total, 10);
     var urls = [];
 
-
-    for (var offset = 0; offset < total; offset += PAGE) {
-        var url = util.format(TWITCH_URL, offset, PAGE);
-        urls.push(url);
+    var offset;
+    for (offset = 0; offset < total; offset += PAGE) {
+        urls.push(util.format(TWITCH_URL, offset, PAGE));
     }
 
     async.eachLimit(urls, TWITCH_PARAL, getStreams, function (err) {
