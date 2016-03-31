@@ -1,5 +1,5 @@
 /*jslint  node:true */
-//'use strict';
+'use strict';
 
 var express = require('express');
 var router = express.Router();
@@ -17,7 +17,6 @@ var datautil = require('./../lib/datautil');
 var gatekeeper = require('./../lib/gatekeeper');
 var moment = require('moment');
 var async = require('async');
-var murmurhash = require('murmurhash');
 
 var TMI_URL = 'http://tmi.twitch.tv/group/user/%s/chatters';
 var SCRIPT_SHA1 = null;
@@ -77,7 +76,7 @@ var getViewers = function (name, cb) {
 };
 
 var processChannel = function (channel, viewers, res) {
-    var gamehash = channel.game ? murmurhash.v3(channel.game).toString(36) : 0,
+    var gamehash = datautil.gamehash36(channel.game),
         date = moment().tz('America/Los_Angeles').format('YYYYMMDD'),
         timestamp = moment().tz('America/Los_Angeles').unix(),
         viewershash = _.map(viewers, datautil.viewershash36);

@@ -1,5 +1,5 @@
 /*jslint  node:true */
-//'use strict';
+'use strict';
 
 var express = require('express');
 var router = express.Router();
@@ -14,7 +14,10 @@ var redis = require('./../lib/redis');
 var periods = require('./../lib/period');
 var async = require('async');
 var datautil = require('./../lib/datautil');
+var storage = require('./../lib/azure-storage');
 var LZString = require('lz-string');
+
+var tableSvc = storage.tableService();
 
 var games = null;
 var getGames = function (callback) {
@@ -47,49 +50,17 @@ var getCacheStats = function (username, dates, callback, params) {
 
     async.each(dates, function (date, dcd) {
 
-        var key = "U:" + (datautil.viewershash(username) % 100) + ':'
+        var key = "U:" + (datautil.viewershash(username) % 1000) + ':'
             + date + ':' + datautil.viewershash36(username);
 
         var pattern = username + ':*';
-        var seed = 0;
-        async.doWhilst(function (cb) {
-                client.hscan([key, seed, 'match', pattern], function (err, data) {
-                    if (err) {
-                        return cb(err);
-                    }
-                    seed = parseInt(data[0], 10);
-                    if (data[1].length) {
 
-                        log.info(data[1]);
-
-                        var i = 0;
-                        for (; i < data[1].length - 1; i += 2) {
-                            var rowkey = data[1][i];
-                            results[rowkey] = results[rowkey] || 0;
-                            results[rowkey] += parseInt(data[1][i + 1]);
-                        }
-
-                            //var obj = datautil.parseStatsKey(rowkey);
-                            //obj.game = params.games[obj.game] || obj.game;
-                            //
-                            //if (!results[rowkey]){
-                            //    results[rowkey] = obj;
-                            //} else {}
-                        //}
-                        
-                    }
-            
-                    cb()
-                });
-
-            },
-            function () {
-                return seed !== 0;
-            }, function (err) {
-                dcd(err)
-            }
-        );
-
+        client.multi_hscan(key, pattern, function (key, value, cbi) {
+            results[key] = (results[key] || 0) + parseInt(value, 10);
+            cbi();
+        }, function (err) {
+            dcd(err)
+        });
 
     }, function (err) {
         client.quit(); //async
@@ -99,12 +70,13 @@ var getCacheStats = function (username, dates, callback, params) {
             result.push({
                 channel: obj.channel,
                 game: params.games[obj.game] || obj.game,
-                duration: value});
+                duration: value
+            });
         }, []);
 
         results = _.reverse(_.sortBy(results, 'duration'));
-        
-        log.info(JSON.stringify(results));
+
+        //log.info(JSON.stringify(results));
 
         callback(err, results);
     });
@@ -113,6 +85,20 @@ var getCacheStats = function (username, dates, callback, params) {
 
 var getArchiveStats = function (username, from, to, callback) {
     callback(null, username);
+
+    //partitionKey = util.format("%d:%s", day, numFmt(keyParts[3], MASK));
+
+    var query = new azure.TableQuery()
+        .where('PartitionKey eq ?', 'part2')
+        .and('RowKey eq ?', username);
+
+    tableSvc.queryEntities(storage.viewerSummaryTable, query, null, function(error, result, response) {
+        if (!error) {
+            // result.entries contains entities matching the query
+        }
+    });
+
+
 };
 
 var mergeStats = function (callback, stats) {

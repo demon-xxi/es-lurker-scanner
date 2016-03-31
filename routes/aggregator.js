@@ -23,36 +23,13 @@ var TABLE_BATCH_SIZE = 50;
 
 require('moment-timezone');
 
-var Agent = require('agentkeepalive').HttpsAgent;
-
-var keepaliveAgent = new Agent({
-    maxSockets: 1000,
-    //maxFreeSockets: 100,
-    timeout: 60000,
-    keepAliveTimeout: 30000 // free socket keepalive for 30 seconds
-});
-
-var azureTable = require('azure-table-node');
-var defaultClient = azureTable.createClient({
-    agent: keepaliveAgent
-});
-
-//var SEED = 1234567;
-//var TOTAL = 3000000;
-//var BUCKET = TOTAL / 100;
-
 var MAX_DAY = 99991231;
 var MASK = '000000';
 
-
-//var tableSvc = storage.tableService();
+var tableSvc = storage.tableService();
 
 var createTable = function (callback) {
-    // tableSvc.createTableIfNotExists(storage.viewerSummaryTable, function (error) {
-    //     callback(error);
-    // });
-
-    defaultClient.createTable(storage.viewerSummaryTable, {ignoreIfExists: true}, function (error) {
+    tableSvc.createTable(storage.viewerSummaryTable, {ignoreIfExists: true}, function (error) {
         callback(error);
     });
 };
@@ -92,9 +69,10 @@ var processGroup = function (task, callback) {
         }
 
         var //entGen = azure.TableUtilities.entityGenerator,
-            keyParts = task.key.split(':'),
+            keyParts = task.key.split(':'), // U:hash:day:bucket
             day = MAX_DAY - parseInt(keyParts[2], 10),
-            partitionKey = util.format("%d:%s", day, numFmt(keyParts[3], MASK));
+            //partitionKey = util.format("%d:%s", day, numFmt(keyParts[3], MASK));
+            partitionKey = keyParts[3];
 
         var totals = _.reduce(pairs, function (result, dur, key) {
             var parts = key.split(':'),
@@ -115,7 +93,7 @@ var processGroup = function (task, callback) {
 
         var cargo = async.cargo(function (jobs, cargocb) {
 
-            var batch = defaultClient.startBatch();
+            var batch = tableSvc.startBatch();
 
             _.each(jobs, function (job) {
                 batch.insertOrReplaceEntity(storage.viewerSummaryTable, job);
@@ -146,10 +124,10 @@ var processGroup = function (task, callback) {
             }
 
             // remove from cache
-            task.redisClient.del(task.key, function (err) {
-                log.info('Removed key: ', task.key);
+            //task.redisClient.del(task.key, function (err) {
+            //    log.info('Removed key: ', task.key);
                 callback(err);
-            });
+            //});
         };
 
         var done = false;
@@ -175,7 +153,7 @@ var processGroup = function (task, callback) {
             } else {
                 cargo.push({
                     PartitionKey: partitionKey,
-                    RowKey: viewer,
+                    RowKey: viewer + ':' + day,
                     Views: compressed,
                     Total: parseInt(summary.total, 10)
                 });
