@@ -16,6 +16,7 @@ var gatekeeper = require('./../lib/gatekeeper');
 var storage = require('./../lib/azure-storage');
 var async = require('async');
 var LZString = require('lz-string');
+var datautil = require('./../lib/datautil');
 
 var READ_CONCURRENCY = 10;
 
@@ -23,8 +24,6 @@ var TABLE_BATCH_SIZE = 50;
 
 require('moment-timezone');
 
-var MAX_DAY = 99991231;
-var MASK = '000000';
 
 var tableSvc = storage.tableService();
 
@@ -70,7 +69,7 @@ var processGroup = function (task, callback) {
 
         var //entGen = azure.TableUtilities.entityGenerator,
             keyParts = task.key.split(':'), // U:hash:day:bucket
-            day = MAX_DAY - parseInt(keyParts[2], 10),
+            day = datautil.reverseDay(parseInt(keyParts[2], 10)),
             //partitionKey = util.format("%d:%s", day, numFmt(keyParts[3], MASK));
             partitionKey = keyParts[3];
 
@@ -124,10 +123,10 @@ var processGroup = function (task, callback) {
             }
 
             // remove from cache
-            //task.redisClient.del(task.key, function (err) {
-            //    log.info('Removed key: ', task.key);
+            task.redisClient.del(task.key, function (err) {
+                log.info('Removed key: ', task.key);
                 callback(err);
-            //});
+            });
         };
 
         var done = false;
@@ -199,25 +198,6 @@ var getKeys = function (date, batch) {
             }
         };
 
-        //redisClient.multi_scan(keys_pattern, function (key, cb) {
-        //    queue.push({
-        //        stats: stats,
-        //        key: key,
-        //        games: games,
-        //        redisClient: redisClient
-        //    });
-        //    cb();
-        //}, function (err) {
-        //    if (err) {
-        //        queue.kill();
-        //        return callback(err, redisClient, stats);
-        //    }
-        //    if (queue.length() === 0) {
-        //        return callback(null, redisClient, stats);
-        //    }
-        //    done = true;
-        //});
-
         redisClient.keys(keys_pattern, function (err, keys) {
             if (err) {
                 queue.kill();
@@ -239,41 +219,6 @@ var getKeys = function (date, batch) {
             done = true;
 
         });
-
-
-        //async.doWhilst(
-        //    function (cb) {
-        //        redisClient.scan([seed, 'match', keys_pattern], function (err, data) {
-        //            if (!err) {
-        //                seed = parseInt(data[0], 10);
-        //                _.forEach(data[1], function (key) {
-        //                    queue.push({
-        //                        stats: stats,
-        //                        key: key,
-        //                        games: games,
-        //                        redisClient: redisClient
-        //                    });
-        //                });
-        //            }
-        //            cb(err);
-        //        });
-        //
-        //    },
-        //    function () {
-        //        return seed !== 0;
-        //    },
-        //
-        //    function (err) {
-        //        if (err) {
-        //            queue.kill();
-        //            return callback(err, redisClient, stats);
-        //        }
-        //        if (queue.length() === 0) {
-        //            return callback(null, redisClient, stats);
-        //        }
-        //        done = true;
-        //    }
-        //);
 
     };
 };

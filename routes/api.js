@@ -15,6 +15,7 @@ var periods = require('./../lib/period');
 var async = require('async');
 var datautil = require('./../lib/datautil');
 var storage = require('./../lib/azure-storage');
+var Query = require('azure-table-node').Query;
 var LZString = require('lz-string');
 
 var tableSvc = storage.tableService();
@@ -84,25 +85,42 @@ var getCacheStats = function (username, dates, callback, params) {
 };
 
 var getArchiveStats = function (username, from, to, callback) {
-    callback(null, username);
 
     //partitionKey = util.format("%d:%s", day, numFmt(keyParts[3], MASK));
 
-    var query = new azure.TableQuery()
-        .where('PartitionKey eq ?', 'part2')
-        .and('RowKey eq ?', username);
+    var query = Query.create()
+        .where('PartitionKey', '==', datautil.viewershash36(username))
+        .and('RowKey', '<=', username + ":" + datautil.reverseDay(from))
+        .and('RowKey', '>=', username + ":" + datautil.reverseDay(to));
 
-    tableSvc.queryEntities(storage.viewerSummaryTable, query, null, function(error, result, response) {
-        if (!error) {
-            // result.entries contains entities matching the query
+    tableSvc.queryEntities(storage.viewerSummaryTable, {query: query}, function(error, data) {
+        if (error) {
+            return callback(error);
         }
+        async.map(data, function (itm, cb) {
+            try {
+                var decompressed = LZString.decompress(itm.Views);
+                return cb(null, decompressed ? JSON.parse(decompressed) : []);
+            } catch (err) {
+                return cb(err);
+            }
+        }, function (err, results) {
+            callback(null, results);
+        });
     });
 
 
 };
 
 var mergeStats = function (callback, stats) {
-    callback(null, stats.cache/* + stats.archive*/);
+    var all = _.flatten(_.concat((stats.cache || []), stats.archive));
+    var grouped = _.groupBy(all, function(itm){return itm.game + '|' + itm.channel;});
+    var merged = _.map(grouped, function (p) {
+        return {game: p[0].game, channel: p[0].channel, duration: _(p).map('duration').sum()};
+    });
+
+    //console.log('MERGED', merged);
+    callback(null, merged);
 };
 
 router.get('/user/:username/stats/:period*?', function (req, res) {
