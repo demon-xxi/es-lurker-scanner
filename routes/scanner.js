@@ -39,6 +39,7 @@ client.on("ready", function () {
         "end; redis.call('SETEX', 'heartbeat:' .. KEYS[2], 660, KEYS[4]); ";
 
     client.script('load', script, function (err, sha) {
+        log.error(err);
         SCRIPT_SHA1 = sha;
     });
 

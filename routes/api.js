@@ -60,7 +60,7 @@ var getCacheStats = function (username, dates, callback, params) {
             results[key] = (results[key] || 0) + parseInt(value, 10);
             cbi();
         }, function (err) {
-            dcd(err)
+            dcd(err);
         });
 
     }, function (err) {
@@ -93,7 +93,7 @@ var getArchiveStats = function (username, from, to, callback) {
         .and('RowKey', '<=', username + ":" + datautil.reverseDay(from))
         .and('RowKey', '>=', username + ":" + datautil.reverseDay(to));
 
-    tableSvc.queryEntities(storage.viewerSummaryTable, {query: query}, function(error, data) {
+    tableSvc.queryEntities(storage.viewerSummaryTable, {query: query}, function (error, data) {
         if (error) {
             return callback(error);
         }
@@ -105,7 +105,7 @@ var getArchiveStats = function (username, from, to, callback) {
                 return cb(err);
             }
         }, function (err, results) {
-            callback(null, results);
+            callback(err, results);
         });
     });
 
@@ -114,7 +114,9 @@ var getArchiveStats = function (username, from, to, callback) {
 
 var mergeStats = function (callback, stats) {
     var all = _.flatten(_.concat((stats.cache || []), stats.archive));
-    var grouped = _.groupBy(all, function(itm){return itm.game + '|' + itm.channel;});
+    var grouped = _.groupBy(all, function (itm) {
+        return itm.game + '|' + itm.channel;
+    });
     var merged = _.map(grouped, function (p) {
         return {game: p[0].game, channel: p[0].channel, duration: _(p).map('duration').sum()};
     });

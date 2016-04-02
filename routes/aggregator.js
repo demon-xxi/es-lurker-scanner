@@ -1,5 +1,5 @@
 /*jslint  node:true */
-//'use strict';
+'use strict';
 
 var express = require('express');
 var router = express.Router();
@@ -36,16 +36,12 @@ var createTable = function (callback) {
 var connectRedis = function (callback) {
     var client = redis.connect();
     client.on("error", function (err) {
-        callback(err);
+        callback(err, client);
     });
     client.on("ready", function () {
         callback(null, client);
     });
 };
-
-//var connectTable = function (callback) {
-//    storage.tableService();
-//};
 
 var getGames = function (redisClient, callback) {
     redisClient.hgetall('games', function (err, games) {
@@ -53,9 +49,6 @@ var getGames = function (redisClient, callback) {
     });
 };
 
-var numFmt = function (num, mask) {
-    return (mask + num).slice(-Math.max(mask.length, (num + '').length));
-};
 
 var processGroup = function (task, callback) {
 
@@ -70,7 +63,7 @@ var processGroup = function (task, callback) {
         var //entGen = azure.TableUtilities.entityGenerator,
             keyParts = task.key.split(':'), // U:hash:day:bucket
             day = datautil.reverseDay(parseInt(keyParts[2], 10)),
-            //partitionKey = util.format("%d:%s", day, numFmt(keyParts[3], MASK));
+        //partitionKey = util.format("%d:%s", day, numFmt(keyParts[3], MASK));
             partitionKey = keyParts[3];
 
         var totals = _.reduce(pairs, function (result, dur, key) {
@@ -176,8 +169,6 @@ var processGroup = function (task, callback) {
 
     });
 
-    //callback(null);
-    //setTimeout(callback, 1000);
 };
 
 var getKeys = function (date, batch) {
@@ -189,7 +180,6 @@ var getKeys = function (date, batch) {
             records: 0,
             errors: 0
         };
-        var seed = 0;
         var done = false;
         var queue = async.queue(processGroup, READ_CONCURRENCY);
         queue.drain = function () {
@@ -204,7 +194,7 @@ var getKeys = function (date, batch) {
                 return callback(err, redisClient, stats);
             }
 
-            _.forEach(keys, function(key){
+            _.forEach(keys, function (key) {
                 queue.push({
                     stats: stats,
                     key: key,
@@ -223,14 +213,6 @@ var getKeys = function (date, batch) {
     };
 };
 
-var cleanup = function (redisClient, stats, callback) {
-    stats.time = new Date().getTime() - stats.time;
-    //redisClient.quit(function (err) {
-    //    callback(err, stats);
-    //});
-    redisClient.unref();
-    callback(null, stats);
-};
 
 router.get('/viewers/:date/:batch', function (req, res) {
 
@@ -249,13 +231,22 @@ router.get('/viewers/:date/:batch', function (req, res) {
         [createTable,
             connectRedis,
             getGames,
-            getKeys(date, batch),
-            cleanup],
-        function (err, stats) {
+            getKeys(date, batch)],
+        function (err, redisClient, stats) {
+
+            //redisClient.quit(function (err) {
+            //    callback(err, stats);
+            //});
+            if (redisClient && redisClient.connected) {
+                redisClient.unref();
+            }
+
             if (err) {
                 log.error(err);
                 return res.status(502).jsonp({error: err});
             }
+
+            stats.time = new Date().getTime() - stats.time;
             return res.status(200).send(stats);
         }
     );
