@@ -238,7 +238,7 @@ router.get('/viewers/:date/:batch', function (req, res) {
             //    callback(err, stats);
             //});
             if (redisClient && redisClient.connected) {
-                redisClient.unref();
+                redisClient.quit();
             }
 
             if (err) {

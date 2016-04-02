@@ -39,8 +39,13 @@ client.on("ready", function () {
         "end; redis.call('SETEX', 'heartbeat:' .. KEYS[2], 660, KEYS[4]); ";
 
     client.script('load', script, function (err, sha) {
-        log.error(err);
+        if (err) {
+            log.error(err);
+        }
         SCRIPT_SHA1 = sha;
+        if (client.connected) {
+            client.quit();
+        }
     });
 
 });
@@ -76,34 +81,46 @@ var getViewers = function (name, cb) {
     });
 };
 
-var processChannel = function (channel, viewers, res) {
+var processChannel = function (channel, viewers, redisClient, callback) {
     var gamehash = datautil.gamehash36(channel.game),
         date = moment().tz('America/Los_Angeles').format('YYYYMMDD'),
         timestamp = moment().tz('America/Los_Angeles').unix(),
         viewershash = _.map(viewers, datautil.viewershash36);
 
-    async.parallel([
-        function (callback) {
-            client.hset('games', gamehash, channel.game || "Unknown", callback);
-        },
-        function (callback) {
-            var args = _.flatten([SCRIPT_SHA1, viewers.length * 2 + 4,
-                date, channel.name, gamehash, timestamp, viewers, viewershash]);
-            client.evalsha(args, function (err, data) {
-                if (err) {
-                    log.error(err);
-                }
-                callback(err, data);
-            });
-        }
+    var args = _.flatten([SCRIPT_SHA1, viewers.length * 2 + 4,
+        date, channel.name, gamehash, timestamp, viewers, viewershash]);
 
-    ], function (err, results) {
-        if (err) {
-            log.error(err, results);
-            return res.status(500).jsonp({error: err});
-        }
-        return res.status(204).send({});
-    });
+    redisClient.batch()
+        .hset('games', gamehash, channel.game || "Unknown")
+        .evalsha(args)
+        .exec(function (err, data) {
+            if (err) {
+                log.error(err, data);
+            }
+            callback(err, data);
+        });
+
+
+    // async.parallel([
+    //     function (cb) {
+    //         redisClient.hset('games', gamehash, channel.game || "Unknown", cb);
+    //     },
+    //     function (cb) {
+    //
+    //         redisClient.evalsha(args, function (err, data) {
+    //             if (err) {
+    //                 log.error(err);
+    //             }
+    //             cb(err, data);
+    //         });
+    //     }
+    //
+    // ], function (err, results) {
+    //     if (err) {
+    //         log.error(err, results);
+    //     }
+    //     callback(err, results);
+    // });
 };
 
 
@@ -120,8 +137,23 @@ router.post('/channel/:channel', function (req, res) {
             log.error(err);
             return res.status(502).jsonp({error: err});
         }
+        
+        var client = redis.connect();
+        client.on("error", function (err) {
+            log.error("Redis error", err);
+        });
 
-        processChannel(channel, viewers, res);
+        processChannel(channel, viewers, client, function (err) {
+
+            if (client) {
+                client.quit();
+            }
+
+            if (err) {
+                return res.status(500).jsonp({error: err});
+            }
+            return res.status(204).send({});
+        });
 
     });
 });
