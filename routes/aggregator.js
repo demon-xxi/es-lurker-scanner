@@ -183,7 +183,7 @@ var getKeys = function (date, batch) {
             }
         };
 
-        keys(keys_pattern, function (err, keys) {
+        redisClient.keys(keys_pattern, function (err, keys) {
             if (err) {
                 queue.kill();
                 return callback(err, stats);
