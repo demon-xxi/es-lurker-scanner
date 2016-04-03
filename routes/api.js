@@ -20,6 +20,11 @@ var LZString = require('lz-string');
 
 var tableSvc = storage.tableService();
 
+var redisClient = redis.connect();
+redisClient.on("error", function (err) {
+    log.error("Redis error", err);
+});
+
 var games = null;
 var getGames = function (callback) {
 
@@ -27,26 +32,13 @@ var getGames = function (callback) {
         return callback(null, games);
     }
 
-    var client = redis.connect();
-    client.on("error", function (err) {
-        log.error("Redis error", err);
-        callback(err);
-    });
-
-    client.hgetall('games', function (err, result) {
-        client.quit(); //async
+    redisClient.hgetall('games', function (err, result) {
         games = result;
         callback(err, games);
     });
 };
 
 var getCacheStats = function (username, dates, callback, params) {
-    var client = redis.connect();
-    client.on("error", function (err) {
-        log.error("Redis error", err);
-        callback(err);
-    });
-
     var results = {};
 
     async.each(dates, function (date, dcd) {
@@ -56,7 +48,7 @@ var getCacheStats = function (username, dates, callback, params) {
 
         var pattern = username + ':*';
 
-        client.multi_hscan(key, pattern, function (key, value, cbi) {
+        redisClient.multi_hscan(key, pattern, function (key, value, cbi) {
             results[key] = (results[key] || 0) + parseInt(value, 10);
             cbi();
         }, function (err) {
@@ -64,8 +56,6 @@ var getCacheStats = function (username, dates, callback, params) {
         });
 
     }, function (err) {
-        client.quit(); //async
-
         results = _.transform(results, function (result, value, key) {
             var obj = datautil.parseStatsKey(key);
             result.push({

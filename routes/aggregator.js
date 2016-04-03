@@ -33,19 +33,14 @@ var createTable = function (callback) {
     });
 };
 
-var connectRedis = function (callback) {
-    var client = redis.connect();
-    client.on("error", function (err) {
-        callback(err, client);
-    });
-    client.on("ready", function () {
-        callback(null, client);
-    });
-};
+var redisClient = redis.connect();
+redisClient.on("error", function (err) {
+    log.error("Redis error", err);
+});
 
-var getGames = function (redisClient, callback) {
+var getGames = function (callback) {
     redisClient.hgetall('games', function (err, games) {
-        callback(err, redisClient, games);
+        callback(err, games);
     });
 };
 
@@ -54,7 +49,7 @@ var processGroup = function (task, callback) {
 
     console.time('hgetall>' + task.key);
     console.time('processGroup > ' + task.key);
-    task.redisClient.hgetall(task.key, function (err, pairs) {
+    redisClient.hgetall(task.key, function (err, pairs) {
         console.timeEnd('hgetall>' + task.key);
         if (err) {
             return callback(err);
@@ -116,7 +111,7 @@ var processGroup = function (task, callback) {
             }
 
             // remove from cache
-            task.redisClient.del(task.key, function (err) {
+            redisClient.del(task.key, function (err) {
                 log.info('Removed key: ', task.key);
                 callback(err);
             });
@@ -173,7 +168,7 @@ var processGroup = function (task, callback) {
 
 var getKeys = function (date, batch) {
     var keys_pattern = util.format("U:%d:%s:*", batch, date);
-    return function (redisClient, games, callback) {
+    return function (games, callback) {
         var stats = {
             batches: 0,
             time: new Date().getTime(),
@@ -184,27 +179,26 @@ var getKeys = function (date, batch) {
         var queue = async.queue(processGroup, READ_CONCURRENCY);
         queue.drain = function () {
             if (done) {
-                callback(null, redisClient, stats);
+                callback(null, stats);
             }
         };
 
-        redisClient.keys(keys_pattern, function (err, keys) {
+        keys(keys_pattern, function (err, keys) {
             if (err) {
                 queue.kill();
-                return callback(err, redisClient, stats);
+                return callback(err, stats);
             }
 
             _.forEach(keys, function (key) {
                 queue.push({
                     stats: stats,
                     key: key,
-                    games: games,
-                    redisClient: redisClient
+                    games: games
                 });
             });
 
             if (queue.length() === 0) {
-                return callback(null, redisClient, stats);
+                return callback(null, stats);
             }
             done = true;
 
@@ -229,17 +223,9 @@ router.get('/viewers/:date/:batch', function (req, res) {
 
     async.waterfall(
         [createTable,
-            connectRedis,
             getGames,
             getKeys(date, batch)],
-        function (err, redisClient, stats) {
-
-            //redisClient.quit(function (err) {
-            //    callback(err, stats);
-            //});
-            if (redisClient) {
-                redisClient.quit();
-            }
+        function (err, stats) {
 
             if (err) {
                 log.error(err);

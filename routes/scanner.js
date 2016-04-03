@@ -23,12 +23,12 @@ var SCRIPT_SHA1 = null;
 
 require('moment-timezone');
 
-var client = redis.connect();
-client.on("error", function (err) {
+var redisClient = redis.connect();
+redisClient.on("error", function (err) {
     log.error("Redis error", err);
 });
 
-client.on("ready", function () {
+redisClient.on("ready", function () {
 
     var script = "local L = redis.call('GET', 'heartbeat:' .. KEYS[2]); local D = 300; " +
         "if L then D = (KEYS[4] - L) end; " +
@@ -38,14 +38,11 @@ client.on("ready", function () {
         "redis.call('HINCRBY', 'U:' .. (tonumber(KEYS[i+H], 36)%1000) .. ':' .. KEYS[1] .. ':' .. KEYS[i+H], KEYS[i] .. ':' .. KEYS[2] .. ':' .. KEYS[3] , D); " +
         "end; redis.call('SETEX', 'heartbeat:' .. KEYS[2], 660, KEYS[4]); ";
 
-    client.script('load', script, function (err, sha) {
+    redisClient.script('load', script, function (err, sha) {
         if (err) {
             log.error(err);
         }
         SCRIPT_SHA1 = sha;
-        if (client.connected) {
-            client.quit();
-        }
     });
 
 });
@@ -81,7 +78,7 @@ var getViewers = function (name, cb) {
     });
 };
 
-var processChannel = function (channel, viewers, redisClient, callback) {
+var processChannel = function (channel, viewers, callback) {
     var gamehash = datautil.gamehash36(channel.game),
         date = moment().tz('America/Los_Angeles').format('YYYYMMDD'),
         timestamp = moment().tz('America/Los_Angeles').unix(),
@@ -137,17 +134,8 @@ router.post('/channel/:channel', function (req, res) {
             log.error(err);
             return res.status(502).jsonp({error: err});
         }
-        
-        var client = redis.connect();
-        client.on("error", function (err) {
-            log.error("Redis error", err);
-        });
 
-        processChannel(channel, viewers, client, function (err) {
-
-            if (client) {
-                client.quit();
-            }
+        processChannel(channel, viewers, function (err) {
 
             if (err) {
                 return res.status(500).jsonp({error: err});
